@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace를 통해 DataDAO와 연결 -->
+<mapper namespace="com.sharp.ing.domain.DataDAO">
+
+	<!--resultMap 은 DB 에서 넘어오는 컬럼의 이름과 java 의 bean 이름이 다를 때 mapping 시켜주는 것 -->
+	<resultMap id="Category" type="com.sharp.ing.domain.CategoryDTO">
+		<result property="code01" column="code01" />
+		<result property="code01_vl" column="code01_vl" />
+		<result property="code02" column="code02" />
+		<result property="code02_vl" column="code02_vl" />
+		<result property="code03" column="code03" />
+		<result property="code03_vl" column="code03_vl" />
+		<result property="code04" column="code04" />
+		<result property="code04_vl" column="code04_vl" />
+	</resultMap>
+
+	<select id="category" resultMap="Category">
+	<![CDATA[
+		select l1.code01_vl, l1.code01, l2.code02_vl, l2.code02, l3.code03_vl, l3.code03, l4.code04_vl, l4.code04
+		From level1 l1 join level2 l2 ON  l1.code01=l2.code01
+		join level3 l3 on l2.code02 = l3.code02
+		join level4 l4 on l3.code03 = l4.code03
+		order by l1.code01_vl, l2.code02_vl, l3.code03_vl, l4.code04_vl;
+	]]>
+	</select>
+
+	<!-- 개별 카테고리 검색의 경우 <select id="autoLevel1" resultMap="level1Result"> <![CDATA[ 
+		select code01, code01_vl From level1 ]]> </select> <select id="autoLevel2" 
+		resultMap="autoConnect" > <![CDATA[ select code02, code02_vl From level2 
+		where code01=#{code01} ]]> </select> <select id="autoLevel3" resultMap="autoConnect"> 
+		<![CDATA[ select code03 From level3 where code01=#{code01} and code02=#{code02} 
+		</select> <select id="autoLevel4" resultMap="autoConnect"> <![CDATA[ select 
+		code04 From level4 where code01=#{code01} and code02=#{code02} and code03=#{code03} 
+		]]> </select> -->
+
+	<!-- parameterType은 조회결과 object / resultType은 결과반환 object -->
+<!-- 	<insert id="insertShoppinglist" parameterType="com.sharp.ing.domain.Shopping_listDTO">
+		<![CDATA[
+		INSERT INTO shopping_list VALUES
+		(#{list_id}, #{id}, #{userId}, #{purchase_date})
+		]]>
+	</insert> -->
+
+<!-- 	<insert id="insertItem" parameterType="com.sharp.ing.domain.ItemDTO">
+		<![CDATA[
+		INSERT INTO item VALUES
+		(#{item_no}, #{list_id}, #{mart_code}, #{price}, #{amount}, #{code01}, #{code02}, #{code03},
+		#{code04}, #{qt_code}, #{qt})
+		]]>
+	</insert> -->
+	
+	<insert id="insertItemHead" parameterType="com.sharp.ing.domain.Shopping_listDTO" >
+		INSERT INTO shopping_list (id, userId, purchase_date) VALUES
+		(#{id}, #{userId}, #{purchase_date})
+	</insert>
+	
+	<select id="selectListID" resultType="int">
+		<![CDATA[
+		select max(list_id) from shopping_list
+		]]>
+	</select>
+	
+	<insert id="insertItem" parameterType="java.util.List" >
+		INSERT INTO item (item_no, list_id, mart_code, price, amount, code01, code02, code03, code04, qt_code, qt) VALUES
+		<foreach collection="list" item="item" separator=",">
+		(#{item.item_no}, #{item.list_id}, #{item.mart_code}, #{item.price}, #{item.amount}, 
+		#{item.code01}, #{item.code02}, #{item.code03}, #{item.code04}, #{item.qt_code}, #{item.qt})
+		</foreach>
+	</insert>
+	
+
+	<resultMap id="viewTotalShopping" type="com.sharp.ing.domain.ShoppingItemDTO">
+	</resultMap>
+
+	<select id="viewTotalShoppingHeader" resultMap= "viewTotalShopping">
+		<![CDATA[
+		select s.list_id, s.purchase_date, i.mart_code
+		from shopping_list s, item i, level4 l4
+		where s.userId='bae' and s.list_id=i.list_id and i.code04 = l4.code04
+		order by i.list_id;
+		]]>	
+	</select>
+
+	<select id="viewTotalShoppingBody" resultMap= "viewTotalShopping">
+		<![CDATA[
+		select i.item_no, l4.code04_vl, i.price, i.amount, i.qt, i.qt_code
+		from shopping_list s, item i, level4 l4
+		where s.userId='bae' and s.list_id=i.list_id and i.code04 = l4.code04
+		order by item_no;
+		]]>	
+	</select>
+
+
+	<resultMap id="viewShoppingItem" type="com.sharp.ing.domain.ShoppingItemDTO">
+	</resultMap>
+
+	<select id="viewShoppingItem" resultMap= "viewShoppingItem">
+		<![CDATA[
+		select s.purchase_date, l4.code04_vl, i.mart_code, i.price, i.amount, i.qt, i.qt_code
+		from shopping_list s, item i, level4 l4
+		where s.userId=#{userId} and i.list_id=#{list_id} and s.list_id=i.list_id and i.code04 = l4.code04;
+		]]>	
+	</select>
+
+	<update id="editShoppinglist" parameterType="com.sharp.ing.domain.Shopping_listDTO">
+		<![CDATA[
+		UPDATE shopping_list
+		SET purchase_date=#{purchase_date}
+		where list_id=#{list_id} and userId=#{userId}
+		]]>
+	</update>
+
+	<update id="editItem" parameterType="com.sharp.ing.domain.ItemDTO">
+		<foreach collection="list" item="item" separator=";">
+		UPDATE item
+		SET mart_code=#{item.mart_code}, price=#{item.price}, amount=#{item.amount}, code01=#{item.code01}, code02=#{item.code02}, code03=#{item.code03}, code04=#{item.code04}, qt_code=#{item.qt_code}, qt=#{item.qt}
+		where list_id=#{item.list_id} and item_no=#{item.item_no}
+		</foreach>
+	</update>
+
+<!-- 	<delete id="deleteList" parameterType="int">
+		<![CDATA[
+		delete from shopping_list where list_id = #{list_id}
+		]]>
+	</delete>
+
+	<delete id="deleteItemList" parameterType="int">
+		<![CDATA[
+		delete from item where list_id = #{list_id}
+		]]>
+	</delete> -->
+
+	<delete id="deleteItem" parameterType="int">
+		<![CDATA[
+		delete from item where list_id=#{list_id} and item_no=#{item_no}
+		]]>
+	</delete>
+
+</mapper>
+

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace를 통해 StatisticsDAO와 연결 -->
+<mapper namespace="com.sharp.ing.domain.NoteDAO">
+
+	<insert id="insertNoteHead"
+		parameterType="com.sharp.ing.domain.Shopping_note_headerDTO">
+		INSERT
+		INTO shopping_note_header (userId, write_date)
+		VALUES
+		(#{userId},curdate());
+	</insert>
+
+	<select id="selectNoteId" resultType="int">
+		<![CDATA[
+		select max(note_id) from shopping_note_header
+		]]>
+	</select>
+
+	<insert id="insertnote" parameterType="java.util.List">
+		INSERT INTO shopping_note ( note_id, code01, code02, code03, code04,
+		note_amount) VALUES
+		<foreach collection="list" item="note" separator=",">
+			(#{note.note_id}, #{note.code01}, #{note.code02}, #{note.code03},
+			#{note.code04}, #{note.note_amount})
+		</foreach>
+	</insert>
+
+
+	<resultMap id="viewTotalNote"
+		type="com.sharp.ing.domain.NoteDTO">
+	</resultMap>
+
+	<select id="viewTotalNoteHeader" resultMap="viewTotalNote">
+		<![CDATA[
+		select distinct h.note_id, h.write_date
+		from shopping_note_header h, shopping_note n
+		where h.userId=#{userId} and h.note_id=n.note_id
+		order by h.note_id;
+		]]>
+	</select>
+
+	<select id="viewTotalNoteBody" resultMap="viewTotalNote">
+		<![CDATA[
+		select n.note_no, n.note_id, l4.code04_vl, n.note_amount
+		from shopping_note_header h, shopping_note n, level4 l4
+		where h.userId=#{userId} and h.note_id=n.note_id and n.code04 = l4.code04
+		order by n.note_no;
+		]]>
+	</select>
+
+	<select id="viewNoteHead" resultMap="viewTotalNote">
+		<![CDATA[
+		select distinct h.note_id, h.write_date
+		from shopping_note_header h, shopping_note n
+		where h.userId=#{userId} and h.note_id=#{note_id} and h.note_id=n.note_id
+		order by h.note_id
+		]]>
+	</select>
+
+	<resultMap id="viewNoteBody"
+		type="com.sharp.ing.domain.Shopping_noteDTO">
+	</resultMap>
+
+	<select id="viewNoteItem" resultMap="viewNoteBody">
+		<![CDATA[
+		select h.write_date, l4.code01, l4.code02, l4.code03, l4.code04, l4.code04_vl, n.note_amount
+		from shopping_note_header h, shopping_note n, level4 l4
+		where h.userId=#{userId} and n.note_id=#{note_id} and h.note_id=n.note_id and n.code04 = l4.code04
+		]]>
+	</select>
+
+	<update id="editNoteHeader"
+		parameterType="com.sharp.ing.domain.Shopping_note_headerDTO">
+		<![CDATA[
+		UPDATE shopping_note_header
+		SET write_date=curdate()
+		where note_id=#{note_id} and userId=#{userId}
+		]]>
+	</update>
+
+	<insert id="editnote" parameterType="java.util.List">
+		insert into shopping_note (note_no, note_id, note_amount, code01,
+		code02, code03, code04)
+		values
+		<foreach collection="list" item="note" separator=",">
+			(#{note.note_no}, #{note.note_id}, #{note.note_amount},
+			#{note.code01}, #{note.code02}, #{note.code03}, #{note.code04})
+		</foreach>
+		on duplicate key update
+		note_no=values(note_no),
+		note_id=values(note_id), note_amount=values(note_amount),
+		code01=values(code01), code02=values(code02), code03=values(code03),
+		code04=values(code04)
+	</insert>
+
+	<delete id="deleteNote" parameterType="int">
+		<![CDATA[
+		delete from shopping_note_header where note_id = #{note_id}
+		]]>
+	</delete>
+
+	<delete id="deleteNoteitem" parameterType="int">
+		<![CDATA[
+		delete from shopping_note where note_id=#{note_id} and note_no=#{note_no}
+		]]>
+	</delete>
+
+</mapper>

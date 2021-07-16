@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace를 통해 StatisticsDAO와 연결 -->
+<mapper namespace="com.sharp.ing.domain.PurchaseDAO">
+
+	<resultMap id="Purchase" type="com.sharp.ing.domain.PurchaseDTO">
+	<result property="code04" column="code04" />
+	<result property="code04_vl" column="code04_vl" />
+	<result property="daily_average" column="daily_average" />
+	<result property="total_qt" column="total_qt" />
+	<result property="purchase_date" column="purchase_date" />
+	<result property="userId" column="userId" />
+	<result property="list_id" column="list_id" />
+	</resultMap>
+
+	<select id="purchase" resultMap="Purchase">
+	<![CDATA[
+	select userId, code04, total_qt, purchase_date, code04_vl
+	from (select  rank()over(partition by code04 order by code04, rank2 desc) as rank1,
+			rank2,
+			code04,
+			sum(total_qt) as total_qt,
+       		code04_vl,
+			purchase_date,
+			userId
+		from (
+			select distinct dense_rank() over(partition by code04 order by code04, purchase_date asc) AS rank2,
+				i.code04,
+				l.code04_vl,
+				i.qt*i.amount*q.qt_code_vl as total_qt,     
+				s.purchase_date,
+				s.userId
+			from item i, shopping_list s, quantity q, level4 l
+			where i.list_id = s.list_id and userId=#{userId} and i.qt_code=q.qt_code and i.code04=l.code04
+			order by code04, purchase_date
+			) total
+		group by
+			code04,
+			code04_vl,
+			purchase_date,
+			userId
+		order by code04, rank2 desc
+		)total
+	where rank2 !=1 and rank1=1
+	order by code04 asc;
+	]]>
+	</select>
+	
+	<select id="dailyAverage" resultMap="Purchase">
+	<![CDATA[
+	select code04, round(avg(ifnull((이전구매용량/datediff),0))) as daily_average
+	from 
+		(
+		select rank2,
+			code04,
+			sum(total_qt) as total_qt,
+			datediff
+					(
+						(
+						select tmp.purchase_date
+						from 
+							(
+							select distinct dense_rank() over(partition by i.code04 order by i.code04, s.purchase_date asc) AS rank2, 
+								i.code04, 
+                                s.purchase_date
+							from item i, shopping_list s
+							where i.list_id = s.list_id and i.code04=test.code04 and userId=#{userId}
+							order by code04, purchase_date
+							) tmp
+						where tmp.rank2=test.rank2
+						),
+						(
+						select tmp.purchase_date
+						from 
+							(
+							select distinct dense_rank() over(partition by i.code04 order by i.code04, s.purchase_date asc) AS rank2, 
+								i.code04, 
+                                s.purchase_date
+							from item i, shopping_list s
+							where i.list_id = s.list_id and i.code04=test.code04 and userId=#{userId}
+							order by code04, purchase_date
+							) tmp
+						where tmp.rank2=test.rank2-1
+						)
+					) as datediff,
+					(
+					select total_qt
+					from
+						(
+						select  rank2,code04,sum(total_qt) as total_qt
+						from 
+							(
+							select distinct dense_rank() over(partition by code04 order by code04, purchase_date asc) AS rank2,
+								i.code04,
+								i.qt*i.amount*q.qt_code_vl as total_qt,     
+								s.purchase_date,
+								s.userId
+							from item i, shopping_list s, quantity q
+							where i.list_id = s.list_id and userId=#{userId} and i.qt_code=q.qt_code
+							order by code04, purchase_date
+							) test
+						group by
+							code04,
+							purchase_date,
+							userId
+						) tmp2
+						where tmp2.code04=test.code04 and tmp2.rank2=test.rank2-1
+					) as "이전구매용량"
+				from 
+					(
+					select distinct dense_rank() over(partition by code04 order by code04, purchase_date asc) AS rank2,
+						i.code04,
+						i.qt*i.amount*q.qt_code_vl as total_qt,     
+						s.purchase_date,
+						s.userId
+					from item i, shopping_list s, quantity q
+					where i.list_id = s.list_id and userId=#{userId} and i.qt_code=q.qt_code
+					order by code04, purchase_date
+					) test
+			group by
+				code04,
+				purchase_date,
+				userId,
+				datediff
+		) a
+	where rank2>1
+	group by code04;
+	]]>
+	</select>
+	
+	<select id="recentPurchase" resultMap="Purchase">
+	<![CDATA[
+	select list_id, code04, code04_vl
+	from
+		(
+		select 
+			distinct dense_rank() over(order by list_id desc) AS rownum,
+			i.code04,
+			s.purchase_date,
+	        s.userId,
+	        l.code04_vl,
+    	    s.list_id
+		from item i, shopping_list s, quantity q, level4 l
+		where i.list_id = s.list_id and userId=#{userId} and i.qt_code=q.qt_code and l.code04=i.code04
+		order by list_id desc
+	)recent
+	where recent.rownum<2;
+	]]>
+	</select>
+	
+</mapper>
